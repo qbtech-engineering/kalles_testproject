@@ -1,11 +1,24 @@
 name: Read Gradle version
 description: Read the version property from a gradle.properties file
 
+inputs:
+  path:
+    description: 'Path to gradle.properties'
+    required: true
+    default: 'gradle.properties'
+  property:
+    description: 'Property to read'
+    required: true
+    default: 'version'
+
 runs:
   using: "composite"
   steps:
     - id: gradle_version
-      uses: christian-draeger/read-gradle-properties@v1.2.1
-      with:
-        path: gradle.properties
-        property: version
+      shell: bash
+      run: |
+        value=$(grep "^${{ inputs.property }}=" ${{ inputs.path }} | cut -d'=' -f2)
+        echo "value=$value" >> $GITHUB_OUTPUT
+      env:
+        property: ${{ inputs.property }}
+        path: ${{ inputs.path }}
