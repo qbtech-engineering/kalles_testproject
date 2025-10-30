@@ -2,10 +2,9 @@ name: Read Gradle version
 description: Read the version property from a gradle.properties file
 
 outputs:
-  value:
+  version:
     description: 'Version from gradle.properties'
     value: ${{ steps.gradle_version.outputs.value }}
-
 
 runs:
   using: "composite"
