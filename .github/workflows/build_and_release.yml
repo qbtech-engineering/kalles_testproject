@@ -1,5 +1,7 @@
 name: Build and Release
-on: [push]
+
+on:
+  workflow_dispatch:
 
 jobs:
   extract-version:
@@ -11,7 +13,7 @@ jobs:
 
       - name: Read Gradle Version
         id: read
-        uses: ./.github/actions/read-gradle-version
+        uses: ./.github/actions/extract-version
 
       - run: echo "Project version is ${{ steps.read.outputs.version }}"
 
