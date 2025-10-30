@@ -1,0 +1,141 @@
+name: Reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        required: true
+        type: string
+      primary_region:
+        required: true
+        type: string
+      secondary_regions:
+        type: string
+      cluster_name:
+        required: true
+        type: string
+      service_name:
+        required: true
+        type: string
+      e2e_event_name:
+        required: true
+        type: string
+env:
+  ECR_REGISTRY: ${{ secrets.ECR_AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.primary_region }}.amazonaws.com
+  ECR_NAME: service-qbneuron-nexus
+  ROLE_TO_ASSUME: role/gh-oidc-${{ inputs.env }}-backend-pipeline
+
+# Required for OIDC
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build_publish_image:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    outputs:
+      image_version: ${{ steps.build_and_push.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Execute Gradle build
+        run: ./gradlew clean build -x check
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.primary_region }}
+
+      - name: Login to Amazon ECR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ECR_REGISTRY }}
+
+      - name: Build and Push Docker Image
+        id: build_and_push
+        uses: ./.github/actions/build-and-push-docker-image
+        with:
+          ecr-registry: ${{ env.ECR_REGISTRY }}
+          ecr-name: ${{ env.ECR_NAME }}
+
+
+  primary_region:
+    needs: build_publish_image
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.primary_region }}
+
+      - name: Deploy to ECS
+        uses: ./.github/actions/deploy-to-ecs
+        with:
+          task-definition-name: ${{ inputs.service_name }}
+          container-name: ${{ inputs.service_name }}
+          image-tag: ${{ env.ECR_REGISTRY }}/${{ env.ECR_NAME }}:${{ needs.build_publish_image.outputs.image_version }}
+          service-name: ${{ inputs.service_name }}
+          cluster-name: ${{ inputs.cluster_name }}
+          region: ${{ inputs.primary_region }}
+          wait-for-service-stability: true
+
+      #      - name: Microsoft Teams Notification
+      #        uses: skitionek/notify-microsoft-teams@master
+      #        if: always()
+      #        with:
+      #          webhook_url: ${{ secrets.MS_TEAMS_WEBHOOK }}
+      #          job: ${{ toJson(job) }}
+      #          steps: ${{ toJson(steps) }}
+      #          title: "`Deployed version ${{ needs.build_publish_image.outputs.image_version }} in ${{ inputs.env }}`"
+
+      - name: Trigger monorepo E2E and API tests
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          repository: qbtech-engineering/test-e2e-api
+          event-type: ${{ inputs.e2e_event_name }}
+
+  secondary_regions:
+    needs: [ build_publish_image, primary_region ]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    strategy:
+      matrix:
+        region: ${{ fromJson(inputs.secondary_regions) }}
+    concurrency:
+      group: deploy-${{ inputs.env }}-${{ matrix.region }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ matrix.region }}
+
+      - name: Deploy to ECS
+        uses: ./.github/actions/deploy-to-ecs
+        with:
+          task-definition-name: ${{ inputs.service_name }}
+          container-name: ${{ inputs.service_name }}
+          image-tag: ${{ env.ECR_REGISTRY }}/${{ env.ECR_NAME }}:${{ needs.build_publish_image.outputs.image_version }}
+          service-name: ${{ inputs.service_name }}
+          cluster-name: ${{ inputs.cluster_name }}
+          region: ${{ matrix.region }}
+          wait-for-service-stability: true

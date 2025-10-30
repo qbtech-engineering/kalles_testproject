@@ -1,0 +1,75 @@
+name: Deploy to Production Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version'
+        required: true
+
+env:
+  ECR_REGISTRY: ${{ secrets.ECR_AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/service-qbneuron-nexus
+  PRIMARY_REGION: eu-west-1
+  SECONDARY_REGIONS: '["us-west-2"]'
+  SERVICE_NAME: prod-qbneuron-nexus
+  CLUSTER_NAME: prod-qbneuron
+  ROLE_TO_ASSUME: role/gh-oidc-prod-backend-pipeline
+
+# Required for OIDC
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy_to_primary_region:
+    runs-on: ubuntu-latest
+    environment: "prod"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ env.PRIMARY_REGION }}
+
+      - name: Deploy to ECS
+        uses: ./.github/actions/deploy-to-ecs
+        with:
+          task-definition-name: ${{ env.SERVICE_NAME }}
+          container-name: ${{ env.SERVICE_NAME }}
+          image-tag: ${{env.ECR_REGISTRY}}:${{inputs.release_version}}
+          service-name: ${{ env.SERVICE_NAME }}
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          region: ${{ env.PRIMARY_REGION }}
+          wait-for-service-stability: true
+
+  deploy_to_secondary_regions:
+    needs: [ deploy_to_primary_region ]
+    runs-on: ubuntu-latest
+    environment: "prod"
+    strategy:
+      matrix:
+        region: ${{ fromJson('["us-west-2"]') }}
+    concurrency:
+      group: deploy-prod-${{ matrix.region }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ matrix.region }}
+
+      - name: Deploy to ECS
+        uses: ./.github/actions/deploy-to-ecs
+        with:
+            task-definition-name: ${{ env.SERVICE_NAME }}
+            container-name: ${{ env.SERVICE_NAME }}
+            image-tag: ${{env.ECR_REGISTRY}}:${{inputs.release_version}}
+            service-name: ${{ env.SERVICE_NAME }}
+            cluster-name: ${{ env.CLUSTER_NAME }}
+            region: ${{ matrix.region }}
+            wait-for-service-stability: true

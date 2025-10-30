@@ -1,0 +1,61 @@
+name: 'Deploy to ECS'
+description: 'Downloads task definition, updates image, and deploys to ECS'
+inputs:
+  task-definition-name:
+    description: 'Name of the ECS task definition'
+    required: true
+  container-name:
+    description: 'Name of the container in the task definition'
+    required: true
+  image-tag:
+    description: 'Docker image tag to deploy'
+    required: true
+  service-name:
+    description: 'Name of the ECS service'
+    required: true
+  cluster-name:
+    description: 'Name of the ECS cluster'
+    required: true
+  region:
+    description: 'AWS region'
+    required: true
+  wait-for-service-stability:
+    description: 'Wait for ECS service to stabilize after deployment (true/false).'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download task definition
+      shell: bash
+      run: |
+        aws ecs describe-task-definition --task-definition ${{ inputs.task-definition-name }} --query taskDefinition > task-definition.json
+
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: ${{ inputs.container-name }}
+        image: ${{ inputs.image-tag }}
+
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ inputs.service-name }}
+        cluster: ${{ inputs.cluster-name }}
+        wait-for-service-stability: ${{ inputs.wait-for-service-stability }}
+
+    - name: Verify deployment
+      shell: bash
+      run: |
+        echo "Verifying deployment in ${{ inputs.region }}"
+        # Add your verification steps here
+
+    - name: Rollback on failure
+      if: failure()
+      shell: bash
+      run: |
+        echo "Deployment failed in ${{ inputs.region }}, initiating rollback"
+        # Add your rollback steps here

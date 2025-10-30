@@ -1,0 +1,43 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - develop # Only enforce rules when PR targets "develop"
+    types: [opened, edited, synchronize]
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  validate-title:
+    name: PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Title Format
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          TITLE_REGEX="^[A-Z]+-[0-9]{1,6}.+$"
+
+          if [[ ! "$PR_TITLE" =~ $TITLE_REGEX ]]; then
+            echo "❌ PR title '${PR_TITLE}' is invalid!"
+            echo "🚨 Format: 'XXX-123 Meaningful title'"
+            exit 1
+          fi
+          echo "✅ PR title is valid!"
+
+  validate-branch:
+    name: Branch name
+    runs-on: ubuntu-latest
+    needs: validate-title
+    steps:
+      - name: Check Branch Name Format
+        run: |
+          PR_BRANCH="${{ github.event.pull_request.head.ref }}"
+          BRANCH_REGEX="^[A-Z]+-[0-9]+-[a-zA-Z0-9-]+|(sync\/main-to-dev)|(lokalise.+)$"
+
+          if [[ ! "$PR_BRANCH" =~ $BRANCH_REGEX ]]; then
+            echo "❌ Branch name '${PR_BRANCH}' is invalid!"
+            echo "🚨 Format: 'XXX-123-branch-name' or 'sync/main-to-dev' or 'lokalise-9999-99-99_99-99-99'"
+            exit 1
+          fi
+          echo "✅ Branch name is valid!"
