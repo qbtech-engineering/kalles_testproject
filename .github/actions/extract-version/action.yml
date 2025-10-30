@@ -1,6 +1,11 @@
-- name: Read Gradle version
-  id: gradle_version
-  uses: christian-draeger/read-gradle-properties@v1.2.1
-  with:
-    path: gradle.properties
-    property: version
+name: Read Gradle version
+description: Read the version property from a gradle.properties file
+
+runs:
+  using: "composite"
+  steps:
+    - id: gradle_version
+      uses: christian-draeger/read-gradle-properties@v1.2.1
+      with:
+        path: gradle.properties
+        property: version
