@@ -22,3 +22,40 @@ jobs:
     needs: extract-version
     steps:
       - run: echo "Releasing version ${{ needs.extract-version.outputs.version }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create release branch
+        id: create_branch
+        env:
+          VERSION: ${{ needs.extract-version.outputs.version }}
+        run: |
+          BRANCH="release/v$VERSION"
+          echo "Creating branch $BRANCH"
+          git checkout -b "$BRANCH"
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Create tag
+        id: create_tag
+        env:
+          VERSION: ${{ needs.extract-version.outputs.version }}
+        run: |
+          TAG="v$VERSION"
+          echo "Creating tag $TAG"
+          git tag -a "$TAG" -m "Release $VERSION"
+          git push origin "$TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "✅ Created branch: ${{ steps.create_branch.outputs.branch }}"
+          echo "✅ Created tag:    ${{ steps.create_tag.outputs.tag }}"
