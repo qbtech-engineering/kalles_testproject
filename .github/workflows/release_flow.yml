@@ -1,0 +1,71 @@
+name: Build, Stage, and (Optionally) Deploy to Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_and_push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run gradle build
+        run: |
+          echo "Running happy build..."
+          ./gradlew build
+
+      - name: Extract version from Gradle
+        id: get_version
+        run: |
+          VERSION=$(grep "^version" build.gradle | sed "s/.*['\"]\\(.*\\)['\"].*/\\1/")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_NAME: my-app
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          docker build -t $ECR_REGISTRY/$IMAGE_NAME:$VERSION .
+          docker push $ECR_REGISTRY/$IMAGE_NAME:$VERSION
+
+  deploy_staging:
+    name: Deploy to ECS (staging)
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    environment: staging
+
+    steps:
+      - name: Update ECS service (staging)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ecs-task-def-staging.json
+          service: my-staging-service
+          cluster: my-staging-cluster
+          wait-for-service-stability: true
+
+  deploy_production:
+    name: Deploy to ECS (production)
+    runs-on: ubuntu-latest
+    needs: deploy_staging
+    environment:
+      name: production
+      url: https://prod.myapp.com
+      # 👇 this triggers manual approval before this job runs
+      # Configure this in your repo Settings → Environments → production → Required reviewers
+
+    steps:
+      - name: Update ECS service (production)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ecs-task-def-prod.json
+          service: my-prod-service
+          cluster: my-prod-cluster
+          wait-for-service-stability: true

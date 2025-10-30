@@ -8,6 +8,9 @@ inputs:
   ecr-name:
     description: 'The name of the ECR repository'
     required: true
+  version:
+    description: 'The version tag for the Docker image'
+    required: true
 
 outputs:
   version:
@@ -39,8 +42,7 @@ runs:
         flavor: |
           latest=false
         tags: |
-          type=raw,value={{ date 'YYYYMMDD_HHmmss' tz='Europe/Stockholm' }}_{{ branch }}_{{ sha }},enable=${{ github.event_name != 'release'}}
-          type=semver,pattern={{version}},enable=${{ github.event_name == 'release'}}
+          type=raw,value=${{ inputs.version }}
 
     - name: Print Version
       shell: bash
