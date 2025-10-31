@@ -1,6 +1,12 @@
 name: Read Gradle version
 description: Read the version property from a gradle.properties file
 
+inputs:
+  is_beta:
+    description: 'Whether to mark the version as beta (true/false)'
+    required: false
+    default: 'false'
+
 outputs:
   version:
     description: 'Version from gradle.properties'
@@ -13,4 +19,9 @@ runs:
       shell: bash
       run: |
         value=$(grep -E "^version=" "gradle.properties" | cut -d'=' -f2- | tr -d '\r' | xargs)
+        
+        if [ "${{ inputs.is_beta }}" = "true" ]; then
+          commit_hash=$(git rev-parse --short HEAD)
+          value="${value}-${commit_hash}"
+        fi
         echo "value=$value" >> $GITHUB_OUTPUT

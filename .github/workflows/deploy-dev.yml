@@ -1,8 +1,8 @@
-name: Deploy to Development Environment
+name: Deploy to DEV
 
 on:
-#  push:
-#    branches: [ develop ]
+  push:
+    branches: [ develop ]
   workflow_dispatch:
 
 jobs:
@@ -13,16 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read Gradle Version
-        id: read
+      - name: Calculate Version with Git Hash
+        id: full_version
         uses: ./.github/actions/extract-version
+        with:
+          is_beta: true
 
-      - name: Get Git Hash
-        id: hash
-        run: echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Combine Version and Hash
-        id: combined
-        run: echo "version=${{ steps.read.outputs.version }}-${{ steps.hash.outputs.hash }}" >> $GITHUB_OUTPUT
-
-      - run: echo "Combined version is ${{ steps.combined.outputs.version }}"
+      - run: echo "Combined version is ${{ steps.full_version.outputs.version }}"
