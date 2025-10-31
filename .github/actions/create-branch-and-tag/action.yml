@@ -1,0 +1,24 @@
+name: 'Branch And Tag Action'
+description: 'Creates release branch and tag'
+inputs:
+  version:
+    required: true
+    description: 'Release version'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure Git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+    - name: Create release branch
+      run: |
+        BRANCH="release/v${{ inputs.version }}"
+        git checkout -b "$BRANCH"
+        git push origin "$BRANCH"
+    - name: Create tag
+      run: |
+        TAG="v${{ inputs.version }}"
+        git tag -a "$TAG" -m "Release ${{ inputs.version }}"
+        git push origin "$TAG"
