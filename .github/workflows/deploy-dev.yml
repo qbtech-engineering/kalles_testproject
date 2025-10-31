@@ -1,18 +1,28 @@
 name: Deploy to Development Environment
 
 on:
-  push:
-    branches: [ develop ]
+#  push:
+#    branches: [ develop ]
   workflow_dispatch:
 
 jobs:
-  deploy-to-dev:
-    uses: ./.github/workflows/reusable-workflow.yml
-    secrets: inherit
-    with:
-      env: "dev"
-      primary_region: eu-north-1
-      secondary_regions: '["us-west-2"]'
-      cluster_name: dev-qbneuron
-      service_name: dev-qbneuron-nexus
-      e2e_event_name: dev-qbneuron-tests
+  extract-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Gradle Version
+        id: read
+        uses: ./.github/actions/extract-version
+
+      - name: Get Git Hash
+        id: hash
+        run: echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Combine Version and Hash
+        id: combined
+        run: echo "version=${{ steps.read.outputs.version }}-${{ steps.hash.outputs.hash }}" >> $GITHUB_OUTPUT
+
+      - run: echo "Combined version is ${{ steps.combined.outputs.version }}"
