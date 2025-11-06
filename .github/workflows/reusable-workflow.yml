@@ -3,6 +3,9 @@ name: Reusable workflow
 on:
   workflow_call:
     inputs:
+      version:
+        required: true
+        type: string
       env:
         required: true
         type: string
@@ -68,7 +71,7 @@ jobs:
         with:
           ecr-registry: ${{ env.ECR_REGISTRY }}
           ecr-name: ${{ env.ECR_NAME }}
-
+          version: ${{ inputs.version }}
 
   primary_region:
     needs: build_publish_image
@@ -93,15 +96,6 @@ jobs:
           cluster-name: ${{ inputs.cluster_name }}
           region: ${{ inputs.primary_region }}
           wait-for-service-stability: true
-
-      #      - name: Microsoft Teams Notification
-      #        uses: skitionek/notify-microsoft-teams@master
-      #        if: always()
-      #        with:
-      #          webhook_url: ${{ secrets.MS_TEAMS_WEBHOOK }}
-      #          job: ${{ toJson(job) }}
-      #          steps: ${{ toJson(steps) }}
-      #          title: "`Deployed version ${{ needs.build_publish_image.outputs.image_version }} in ${{ inputs.env }}`"
 
       - name: Trigger monorepo E2E and API tests
         uses: peter-evans/repository-dispatch@v3

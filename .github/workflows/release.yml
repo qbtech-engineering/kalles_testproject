@@ -73,8 +73,6 @@ jobs:
     environment:
       name: production
       url: https://clinic.qbtech.com
-      # 👇 this triggers manual approval before this job runs
-      # Configure this in your repo Settings → Environments → production → Required reviewers
 
     steps:
       - name: Update ECS service (PROD)

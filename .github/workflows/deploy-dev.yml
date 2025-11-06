@@ -20,3 +20,15 @@ jobs:
           is_beta: true
 
       - run: echo "Combined version is ${{ steps.full_version.outputs.version }}"
+
+  deploy-to-dev:
+    uses: ./.github/workflows/reusable-workflow.yml
+    secrets: inherit
+    with:
+      env: "dev"
+      version: ${{ needs.extract-version.outputs.version }}
+      primary_region: eu-north-1
+      secondary_regions: '["us-west-2"]'
+      cluster_name: dev-qbneuron
+      service_name: dev-qbneuron-nexus
+      e2e_event_name: dev-qbneuron-tests
