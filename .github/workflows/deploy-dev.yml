@@ -13,13 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Calculate Version with Git Hash
-        id: full_version
+      - name: Read Gradle Version
+        id: read
         uses: ./.github/actions/extract-version
         with:
           is_beta: true
 
-      - run: echo "Combined version is ${{ steps.full_version.outputs.version }}"
+      - run: echo "Project version is ${{ steps.read.outputs.version }}"
 
   deploy-dev:
     name: Deploy to ECS (dev)
@@ -41,5 +41,5 @@ jobs:
       - name: Report release
         shell: bash
         run: |
-          echo ${{ github.actor }} released version ${{ needs.extract-version.outputs.version }} of ${{ github.repository }} DEV
+          curl -X POST https://httpbin.org/post -H "Content-Type: application/json" -d '{"version":"${{ needs.extract-version.outputs.version }}","application": "${{ github.repository }}","environment":"dev","deployed_by":"${{ github.actor }}"}'
 
