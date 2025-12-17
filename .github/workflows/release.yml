@@ -66,6 +66,16 @@ jobs:
         run: |
           echo "Deploying version ${{ needs.extract-version.outputs.version }} to staging"
 
+  report-release-stage:
+    name: Report Release on stage
+    runs-on: ubuntu-latest
+    needs: deploy-stage
+    steps:
+      - name: Report release
+        shell: bash
+        run: |
+          echo ${{ github.actor }} released version ${{ inputs.version }} of ${{ github.repository }}
+
   deploy-prod:
     name: Deploy to ECS (PROD)
     runs-on: ubuntu-latest
@@ -78,3 +88,13 @@ jobs:
       - name: Update ECS service (PROD)
         run: |
             echo "Deploying version ${{ needs.extract-version.outputs.version }} to production"
+
+  report-release-prod:
+    name: Report Release on prod
+    runs-on: ubuntu-latest
+    needs: deploy-prod
+    steps:
+      - name: Report release
+        shell: bash
+        run: |
+          echo ${{ github.actor }} released version ${{ inputs.version }} of ${{ github.repository }}
