@@ -1,1 +1,1 @@
-rootProject.name = "simple-kotlin-gradle"
+rootProject.name = "kalles_testprojekt"
